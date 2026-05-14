@@ -41,16 +41,15 @@ export default function DashboardPage() {
     load();
   }, [router, supabase]);
 
-  async function handleSearch(q: string) {
-    setSearch(q);
-    if (q.length < 1) { setSearchResults([]); return; }
-    const { data } = await supabase
-      .from("companies")
-      .select("id, ticker, name, country")
-      .or(`ticker.ilike.%${q}%,name.ilike.%${q}%`)
-      .limit(10);
-    setSearchResults(data ?? []);
-  }
+  // debounce: 입력 멈춘 후 200ms 뒤에 검색
+  useEffect(() => {
+    if (search.length < 1) { setSearchResults([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc("search_companies", { q: search });
+      setSearchResults((data as Company[]) ?? []);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [search, supabase]);
 
   async function subscribe(company: Company) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,7 +98,7 @@ export default function DashboardPage() {
             type="text"
             placeholder="종목 검색 (예: AAPL, Apple)"
             value={search}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full border rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {searchResults.length > 0 && (
